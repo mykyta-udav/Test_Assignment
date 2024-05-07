@@ -1,4 +1,4 @@
-package com.example.test_assignment;
+package com.example.test_assignment.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

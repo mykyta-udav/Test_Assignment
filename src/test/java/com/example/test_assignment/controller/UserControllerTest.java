@@ -1,26 +1,26 @@
 package com.example.test_assignment.controller;
 
-import com.example.test_assignment.model.User;
+import com.example.test_assignment.dto.request.UserRequestDto;
+import com.example.test_assignment.dto.response.UserResponseDto;
 import com.example.test_assignment.service.UserService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
-
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doNothing;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-
+@ExtendWith(SpringExtension.class)
 @WebMvcTest(UserController.class)
 public class UserControllerTest {
 
@@ -33,58 +33,87 @@ public class UserControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private User user;
+    private UserRequestDto userRequestDto;
+    private UserResponseDto userResponseDto;
 
     @BeforeEach
-    void setUp() {
-        user = new User(1L, "user@example.com", "John", "Doe", LocalDate.of(1995, 5, 20), "123 Main St", "+1234567890");
+    void setup() {
+        userRequestDto = new UserRequestDto(); // Populate with test data
+        userResponseDto = new UserResponseDto(); // Populate with test data
     }
 
     @Test
-    void createUser() throws Exception {
-        given(userService.addUser(user)).willReturn(user);
-        mockMvc.perform(MockMvcRequestBuilders.post("/users")
+    void testCreateUser() throws Exception {
+        when(userService.addUser(any(UserRequestDto.class))).thenReturn(userResponseDto);
+
+        mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(user)))
-                .andExpect(MockMvcResultMatchers.status().isCreated())
-                .andExpect(MockMvcResultMatchers.jsonPath("$.email").value("user@example.com"))
-                .andDo(print());
+                        .content(objectMapper.writeValueAsString(userRequestDto)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(userResponseDto.getEmail()));
+
+        verify(userService, times(1)).addUser(any(UserRequestDto.class));
     }
 
     @Test
-    void updateUser() throws Exception {
-        given(userService.updateUser(1L, user)).willReturn(user);
-        mockMvc.perform(MockMvcRequestBuilders.put("/users/1")
+    void testUpdateUser() throws Exception {
+        when(userService.updateUser(anyLong(), any(UserRequestDto.class), eq(true))).thenReturn(userResponseDto);
+
+        mockMvc.perform(put("/users/{id}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(user)))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$.firstName").value("John"))
-                .andDo(print());
+                        .content(objectMapper.writeValueAsString(userRequestDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(userResponseDto.getEmail()));
+
+        verify(userService, times(1)).updateUser(anyLong(), any(UserRequestDto.class), eq(true));
     }
 
     @Test
-    void deleteUser() throws Exception {
-        doNothing().when(userService).deleteUser(1L);
-        mockMvc.perform(MockMvcRequestBuilders.delete("/users/1"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andDo(print());
+    void testPatchUser() throws Exception {
+        when(userService.updateUser(anyLong(), any(UserRequestDto.class), eq(false))).thenReturn(userResponseDto);
+
+        mockMvc.perform(patch("/users/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(userRequestDto)))
+                .andExpect(status().isOk());
+
+        verify(userService, times(1)).updateUser(anyLong(), any(UserRequestDto.class), eq(false));
     }
 
     @Test
-    void searchUsersByBirthDateRange() throws Exception {
-        mockMvc.perform(MockMvcRequestBuilders.get("/users?from=1995-01-01&to=1995-12-31"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$").isArray())
-                .andDo(print());
+    void testDeleteUser() throws Exception {
+        doNothing().when(userService).deleteUser(anyLong());
+
+        mockMvc.perform(delete("/users/{id}", 1L))
+                .andExpect(status().isOk());
+
+        verify(userService, times(1)).deleteUser(anyLong());
     }
 
     @Test
-    void getAllUsers() throws Exception {
-        List<User> allUsers = Arrays.asList(user);
-        given(userService.getAllUsers()).willReturn(allUsers);
-        mockMvc.perform(MockMvcRequestBuilders.get("/users/all"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$[0].email").value("user@example.com"))
-                .andDo(print());
+    void testGetAllUsers() throws Exception {
+        List<UserResponseDto> users = Collections.singletonList(userResponseDto);
+        when(userService.getAllUsers()).thenReturn(users);
+
+        mockMvc.perform(get("/users/all"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(userResponseDto.getEmail()));
+
+        verify(userService, times(1)).getAllUsers();
     }
+    @Test
+    void testSearchUsersByBirthDateRange() throws Exception {
+        List<UserResponseDto> users = Collections.singletonList(userResponseDto);
+        LocalDate from = LocalDate.of(1990, 1, 1);
+        LocalDate to = LocalDate.now();
+        when(userService.searchUsersByBirthDateRange(from, to)).thenReturn(users);
+
+        mockMvc.perform(get("/users")
+                        .param("from", from.toString())
+                        .param("to", to.toString()))
+                .andExpect(status().isOk());
+
+        verify(userService, times(1)).searchUsersByBirthDateRange(from, to);
+    }
+
 }
